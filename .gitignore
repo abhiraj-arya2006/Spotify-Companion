@@ -39,5 +39,9 @@ desktop.ini
 # TypeScript cache
 *.tsbuildinfo
 
-# Vite cache (Phase 7)
+# Vite cache
 .vite/
+
+# Claude harness
+.claude/
+
