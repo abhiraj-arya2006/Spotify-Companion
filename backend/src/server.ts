@@ -39,6 +39,9 @@ getDb();
 // ---------------------------------------------------------------------------
 const app = express();
 
+// Trust proxy headers from Render, Cloudflare, etc. for secure cookies behind reverse proxy
+app.set('trust proxy', 1);
+
 // ---------------------------------------------------------------------------
 // Security headers (helmet)
 // In dev mode, relax CSP so the test HTML page can load inline scripts
@@ -168,14 +171,16 @@ app.use((
 
 // ---------------------------------------------------------------------------
 // Start server
+// Bind to 0.0.0.0 so cloud providers like Render can detect the open port
 // ---------------------------------------------------------------------------
-const server = app.listen(env.server.port, '127.0.0.1', () => {
+const host = process.env.HOST || '0.0.0.0';
+const server = app.listen(env.server.port, host, () => {
   console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('  🎵 Spotify Companion AI — Backend Server');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log(`  Local:   http://127.0.0.1:${env.server.port}`);
-  console.log(`  Connect: http://127.0.0.1:${env.server.port}/auth/spotify`);
-  console.log(`  Health:  http://127.0.0.1:${env.server.port}/health`);
+  console.log(`  Host:    http://${host}:${env.server.port}`);
+  console.log(`  Connect: http://${host}:${env.server.port}/auth/spotify`);
+  console.log(`  Health:  http://${host}:${env.server.port}/health`);
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 });
 
