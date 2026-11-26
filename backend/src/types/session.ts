@@ -21,5 +21,10 @@ declare module 'express-session' {
      * Compared against the `state` parameter in the callback to prevent CSRF.
      */
     oauthState?: string;
+
+    /**
+     * The dynamically resolved redirect URI for this authorization session.
+     */
+    oauthRedirectUri?: string;
   }
 }

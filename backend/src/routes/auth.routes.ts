@@ -28,6 +28,19 @@ import type { SpotifyTokenResponse } from '../types/spotify';
 
 export const authRouter = Router();
 
+/**
+ * Resolves the appropriate Spotify redirect URI for the incoming request.
+ * Automatically adapts between local development, custom LAN IP, and public cloud domains (e.g. Render).
+ */
+function resolveRedirectUri(req: Router extends never ? never : import('express').Request): string {
+  const host = req.get('host');
+  if (host && !host.startsWith('localhost') && !host.startsWith('127.0.0.1')) {
+    const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'https';
+    return `${proto}://${host}/auth/spotify/callback`;
+  }
+  return env.spotify.redirectUri;
+}
+
 // ---------------------------------------------------------------------------
 // GET /auth/spotify — Start Spotify OAuth flow
 // ---------------------------------------------------------------------------
@@ -35,19 +48,21 @@ export const authRouter = Router();
 authRouter.get('/spotify', (req, res) => {
   // Generate a cryptographically random state nonce (CSRF protection)
   const state = crypto.randomBytes(32).toString('hex');
+  const redirectUri = resolveRedirectUri(req);
   req.session.oauthState = state;
+  req.session.oauthRedirectUri = redirectUri;
 
   const params = new URLSearchParams({
     client_id: env.spotify.clientId,
     response_type: 'code',
-    redirect_uri: env.spotify.redirectUri,
+    redirect_uri: redirectUri,
     scope: env.spotify.scopes,
     state,
     // show_dialog: 'true', // uncomment to always show Spotify auth dialog
   });
 
   const authUrl = `https://accounts.spotify.com/authorize?${params.toString()}`;
-  console.log(`[auth] Initiating Spotify OAuth for session ${req.sessionID}`);
+  console.log(`[auth] Initiating Spotify OAuth for session ${req.sessionID} with redirect_uri: ${redirectUri}`);
 
   res.redirect(authUrl);
 });
@@ -81,12 +96,16 @@ authRouter.get('/spotify/callback', async (req, res): Promise<void> => {
     return;
   }
 
-  // Clear state from session immediately — it's single-use
+  // Retrieve matching redirectUri for token exchange
+  const redirectUri = req.session.oauthRedirectUri || env.spotify.redirectUri;
+
+  // Clear single-use state from session
   delete req.session.oauthState;
+  delete req.session.oauthRedirectUri;
 
   try {
     // 4. Exchange authorization code for access + refresh tokens
-    const tokens = await exchangeCodeForTokens(code);
+    const tokens = await exchangeCodeForTokens(code, redirectUri);
 
     // 5. Fetch the user's Spotify profile
     const profile = await getCurrentUserProfile(tokens.access_token);
@@ -159,7 +178,7 @@ authRouter.post('/logout', (req, res): void => {
 // ---------------------------------------------------------------------------
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function exchangeCodeForTokens(code: string): Promise<SpotifyTokenResponse> {
+async function exchangeCodeForTokens(code: string, redirectUri: string = env.spotify.redirectUri): Promise<SpotifyTokenResponse> {
   const credentials = Buffer.from(
     `${env.spotify.clientId}:${env.spotify.clientSecret}`
   ).toString('base64');
@@ -173,7 +192,7 @@ async function exchangeCodeForTokens(code: string): Promise<SpotifyTokenResponse
     body: new URLSearchParams({
       grant_type: 'authorization_code',
       code,
-      redirect_uri: env.spotify.redirectUri,
+      redirect_uri: redirectUri,
     }),
   });
 
