@@ -1,0 +1,43 @@
+# Spotify Companion AI — Project Root .gitignore
+
+# Node modules (at any depth)
+node_modules/
+
+# Build artifacts
+dist/
+build/
+
+# Environment secrets — NEVER commit
+.env
+*.env.local
+
+# SQLite database files (contain OAuth tokens)
+*.db
+*.sqlite
+*.sqlite3
+backend/data/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Vite cache (Phase 7)
+.vite/

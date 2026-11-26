@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spotify Companion AI</title>
+  <style>
+    :root {
+      --green: #1DB954;
+      --green-dark: #1aa34a;
+      --bg: #0a0a0a;
+      --surface: #121212;
+      --surface-elevated: #1a1a1a;
+      --border: #2a2a2a;
+      --text-primary: #ffffff;
+      --text-secondary: #b3b3b3;
+      --text-muted: #6a6a6a;
+      --red: #e22134;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 680px;
+      width: 100%;
+      margin-top: 3rem;
+    }
+
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--green);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    h1 span { color: var(--green); }
+
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: var(--surface-elevated);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .card-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 1.25rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.75rem 1.5rem;
+      border-radius: 999px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: transform 80ms, background 150ms;
+      text-decoration: none;
+    }
+
+    .btn:active { transform: scale(0.97); }
+
+    .btn-spotify {
+      background: var(--green);
+      color: #000;
+    }
+
+    .btn-spotify:hover { background: var(--green-dark); }
+
+    .btn-danger {
+      background: transparent;
+      color: var(--red);
+      border: 1px solid var(--red);
+    }
+
+    .btn-danger:hover { background: rgba(226, 33, 52, 0.08); }
+
+    .btn-secondary {
+      background: var(--border);
+      color: var(--text-primary);
+    }
+
+    .btn-secondary:hover { background: #333; }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.3rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .status-pill.connected {
+      background: rgba(29, 185, 84, 0.15);
+      color: var(--green);
+    }
+
+    .status-pill.disconnected {
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--text-muted);
+    }
+
+    .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .dot.green { background: var(--green); }
+    .dot.gray { background: var(--text-muted); }
+
+    .profile-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .avatar {
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      flex-shrink: 0;
+    }
+
+    .avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+
+    .profile-info { flex: 1; }
+
+    .profile-name {
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    .profile-meta {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      margin-top: 0.2rem;
+    }
+
+    .data-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .data-item {
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 0.75rem;
+    }
+
+    .data-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .data-value {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-top: 0.25rem;
+    }
+
+    .track-list { list-style: none; }
+
+    .track-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .track-item:last-child { border-bottom: none; }
+
+    .track-num {
+      width: 1.5rem;
+      text-align: right;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .track-art {
+      width: 40px; height: 40px;
+      border-radius: 4px;
+      object-fit: cover;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+
+    .track-info { flex: 1; min-width: 0; }
+
+    .track-name {
+      font-size: 0.88rem;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .track-artist {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+
+    .alert {
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .alert-success {
+      background: rgba(29, 185, 84, 0.12);
+      border: 1px solid rgba(29, 185, 84, 0.3);
+      color: #4ade80;
+    }
+
+    .alert-error {
+      background: rgba(226, 33, 52, 0.1);
+      border: 1px solid rgba(226, 33, 52, 0.3);
+      color: #f87171;
+    }
+
+    #endpoint-output {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: 'Courier New', monospace;
+      font-size: 0.78rem;
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #a3e635;
+      margin-top: 1rem;
+      display: none;
+    }
+
+    .hidden { display: none !important; }
+    .loading { opacity: 0.5; pointer-events: none; }
+
+    footer {
+      margin-top: 3rem;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="logo-row">
+      <div class="logo-icon">🎵</div>
+      <h1>Spotify <span>Companion</span> AI</h1>
+    </div>
+    <p class="subtitle">Your personal AI-powered music curator — Phase 3 Development Build</p>
+
+    <!-- Alerts (shown based on URL params) -->
+    <div id="alert-container"></div>
+
+    <!-- Auth Card -->
+    <div class="card" id="auth-card">
+      <div class="card-title">Spotify Connection</div>
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem;">
+        <span class="status-pill disconnected" id="status-pill">
+          <span class="dot gray" id="status-dot"></span>
+          <span id="status-text">Checking...</span>
+        </span>
+        <div class="btn-row" style="margin-top:0;">
+          <a href="/auth/spotify" class="btn btn-spotify" id="connect-btn" style="display:none;">
+            ♪ Connect Spotify
+          </a>
+          <button class="btn btn-danger" id="disconnect-btn" onclick="logout()" style="display:none;">
+            Disconnect
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile Card (shown when authenticated) -->
+    <div class="card hidden" id="profile-card">
+      <div class="card-title">Your Spotify Profile</div>
+      <div class="profile-row">
+        <div class="avatar" id="avatar">👤</div>
+        <div class="profile-info">
+          <div class="profile-name" id="profile-name">—</div>
+          <div class="profile-meta" id="profile-meta">—</div>
+        </div>
+      </div>
+      <div class="data-grid" id="profile-data-grid"></div>
+    </div>
+
+    <!-- Top Tracks Card (shown when authenticated) -->
+    <div class="card hidden" id="tracks-card">
+      <div class="card-title">Your Top Tracks (last 4 weeks)</div>
+      <ul class="track-list" id="tracks-list">
+        <li style="color:var(--text-muted); font-size:0.88rem;">Loading...</li>
+      </ul>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="loadTopTracks('short_term')">Last 4 weeks</button>
+        <button class="btn btn-secondary" onclick="loadTopTracks('medium_term')">Last 6 months</button>
+        <button class="btn btn-secondary" onclick="loadTopTracks('long_term')">All time</button>
+      </div>
+    </div>
+
+    <!-- API Explorer Card -->
+    <div class="card hidden" id="explorer-card">
+      <div class="card-title">API Explorer</div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="fetchEndpoint('/spotify/top/artists?timeRange=medium_term&limit=10')">Top Artists</button>
+        <button class="btn btn-secondary" onclick="fetchEndpoint('/spotify/playlists?limit=10')">Playlists</button>
+        <button class="btn btn-secondary" onclick="fetchEndpoint('/spotify/library/tracks?limit=5')">Saved Tracks</button>
+        <button class="btn btn-secondary" onclick="fetchEndpoint('/health')">Health</button>
+      </div>
+      <div id="endpoint-output"></div>
+    </div>
+
+  </div>
+
+  <footer>Spotify Companion AI · Phase 3 · Backend &amp; Authentication</footer>
+
+  <script>
+    // -----------------------------------------------------------------------
+    // Boot
+    // -----------------------------------------------------------------------
+    (async function init() {
+      // Check URL params for auth result
+      const params = new URLSearchParams(location.search);
+      if (params.get('connected') === 'true') {
+        showAlert('success', '✓ Spotify connected successfully!');
+        // Clean URL
+        history.replaceState({}, '', '/');
+      } else if (params.get('error')) {
+        const errorMessages = {
+          access_denied: 'You cancelled the Spotify authorization.',
+          state_mismatch: 'Security check failed. Please try connecting again.',
+          auth_failed: 'Authentication failed. Check the server logs.',
+          invalid_callback: 'Invalid callback parameters received.',
+        };
+        const msg = errorMessages[params.get('error')] || `Error: ${params.get('error')}`;
+        showAlert('error', msg);
+        history.replaceState({}, '', '/');
+      }
+
+      await checkAuthStatus();
+    })();
+
+    // -----------------------------------------------------------------------
+    // Auth status check
+    // -----------------------------------------------------------------------
+    async function checkAuthStatus() {
+      try {
+        const res = await fetch('/auth/status', { credentials: 'include' });
+        const data = await res.json();
+
+        if (data.authenticated) {
+          setConnected(true);
+          await Promise.all([loadProfile(), loadTopTracks('short_term')]);
+          document.getElementById('explorer-card').classList.remove('hidden');
+        } else {
+          setConnected(false);
+        }
+      } catch (e) {
+        setConnected(false);
+      }
+    }
+
+    function setConnected(isConnected) {
+      const pill = document.getElementById('status-pill');
+      const dot = document.getElementById('status-dot');
+      const text = document.getElementById('status-text');
+      const connectBtn = document.getElementById('connect-btn');
+      const disconnectBtn = document.getElementById('disconnect-btn');
+
+      if (isConnected) {
+        pill.className = 'status-pill connected';
+        dot.className = 'dot green';
+        text.textContent = 'Connected';
+        connectBtn.style.display = 'none';
+        disconnectBtn.style.display = 'inline-flex';
+        document.getElementById('profile-card').classList.remove('hidden');
+        document.getElementById('tracks-card').classList.remove('hidden');
+      } else {
+        pill.className = 'status-pill disconnected';
+        dot.className = 'dot gray';
+        text.textContent = 'Not connected';
+        connectBtn.style.display = 'inline-flex';
+        disconnectBtn.style.display = 'none';
+        document.getElementById('profile-card').classList.add('hidden');
+        document.getElementById('tracks-card').classList.add('hidden');
+        document.getElementById('explorer-card').classList.add('hidden');
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Profile
+    // -----------------------------------------------------------------------
+    async function loadProfile() {
+      const res = await fetch('/spotify/profile', { credentials: 'include' });
+      if (!res.ok) return;
+      const { profile } = await res.json();
+
+      document.getElementById('profile-name').textContent = profile.display_name || profile.id;
+      document.getElementById('profile-meta').textContent = profile.email;
+
+      // Avatar
+      const avatarEl = document.getElementById('avatar');
+      if (profile.images && profile.images[0]) {
+        avatarEl.innerHTML = `<img src="${profile.images[0].url}" alt="Profile" />`;
+      }
+
+      // Data grid
+      const grid = document.getElementById('profile-data-grid');
+      grid.innerHTML = [
+        { label: 'Country', value: profile.country || '—' },
+        { label: 'Account', value: profile.product === 'premium' ? '✓ Premium' : profile.product || '—' },
+        { label: 'Followers', value: profile.followers?.total?.toLocaleString() || '0' },
+        { label: 'Spotify ID', value: profile.id },
+      ].map(d => `
+        <div class="data-item">
+          <div class="data-label">${d.label}</div>
+          <div class="data-value">${d.value}</div>
+        </div>
+      `).join('');
+    }
+
+    // -----------------------------------------------------------------------
+    // Top tracks
+    // -----------------------------------------------------------------------
+    async function loadTopTracks(timeRange) {
+      const list = document.getElementById('tracks-list');
+      list.innerHTML = '<li style="color:var(--text-muted); font-size:0.88rem;">Loading...</li>';
+
+      const labels = {
+        short_term: 'last 4 weeks',
+        medium_term: 'last 6 months',
+        long_term: 'all time',
+      };
+      document.querySelector('#tracks-card .card-title').textContent =
+        `Your Top Tracks (${labels[timeRange] || timeRange})`;
+
+      try {
+        const res = await fetch(`/spotify/top/tracks?timeRange=${timeRange}&limit=10`, { credentials: 'include' });
+        if (!res.ok) { list.innerHTML = '<li style="color:var(--red);">Failed to load tracks.</li>'; return; }
+        const data = await res.json();
+
+        if (!data.items || data.items.length === 0) {
+          list.innerHTML = '<li style="color:var(--text-muted); font-size:0.88rem;">No top tracks found for this period.</li>';
+          return;
+        }
+
+        list.innerHTML = data.items.map((track, i) => `
+          <li class="track-item">
+            <span class="track-num">${i + 1}</span>
+            <img class="track-art" src="${track.album.images[2]?.url || track.album.images[0]?.url || ''}" alt="" onerror="this.style.visibility='hidden'" />
+            <div class="track-info">
+              <div class="track-name">${escapeHtml(track.name)}</div>
+              <div class="track-artist">${escapeHtml(track.artists.map(a => a.name).join(', '))} · ${escapeHtml(track.album.name)}</div>
+            </div>
+          </li>
+        `).join('');
+      } catch (e) {
+        list.innerHTML = `<li style="color:var(--red);">Error: ${escapeHtml(e.message)}</li>`;
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // API Explorer
+    // -----------------------------------------------------------------------
+    async function fetchEndpoint(endpoint) {
+      const output = document.getElementById('endpoint-output');
+      output.style.display = 'block';
+      output.textContent = `Fetching ${endpoint}...\n`;
+      try {
+        const res = await fetch(endpoint, { credentials: 'include' });
+        const data = await res.json();
+        output.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        output.textContent = `Error: ${e.message}`;
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Logout
+    // -----------------------------------------------------------------------
+    async function logout() {
+      try {
+        await fetch('/auth/logout', { method: 'POST', credentials: 'include' });
+        setConnected(false);
+        showAlert('success', 'Disconnected from Spotify.');
+      } catch (e) {
+        showAlert('error', 'Failed to disconnect.');
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Utilities
+    // -----------------------------------------------------------------------
+    function showAlert(type, message) {
+      const container = document.getElementById('alert-container');
+      const div = document.createElement('div');
+      div.className = `alert alert-${type}`;
+      div.textContent = message;
+      container.appendChild(div);
+      setTimeout(() => div.remove(), 6000);
+    }
+
+    function escapeHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = String(str);
+      return d.innerHTML;
+    }
+  </script>
+</body>
+</html>

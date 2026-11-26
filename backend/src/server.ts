@@ -1,0 +1,196 @@
+/**
+ * server.ts
+ *
+ * Spotify Companion AI — Express server entry point.
+ *
+ * Startup sequence:
+ * 1. Load and validate environment variables
+ * 2. Initialize SQLite database (creates schema if needed)
+ * 3. Configure Express middleware (security, sessions, CORS)
+ * 4. Register API routes
+ * 5. Serve the test HTML page (pre-React, Phase 3 only)
+ * 6. Register global error handler
+ * 7. Start listening
+ */
+
+// Must be first — loads .env before anything else imports `env`
+import './config/env';
+
+import express from 'express';
+import session from 'express-session';
+import helmet from 'helmet';
+import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
+import { env } from './config/env';
+import { getDb } from './db/database';
+import { authRouter } from './routes/auth.routes';
+import { spotifyRouter } from './routes/spotify.routes';
+import { dataRouter } from './routes/data.routes';
+import { aiRouter } from './routes/ai.routes';
+
+// ---------------------------------------------------------------------------
+// Initialize database (creates tables if they don't exist)
+// ---------------------------------------------------------------------------
+getDb();
+
+// ---------------------------------------------------------------------------
+// Create Express app
+// ---------------------------------------------------------------------------
+const app = express();
+
+// ---------------------------------------------------------------------------
+// Security headers (helmet)
+// In dev mode, relax CSP so the test HTML page can load inline scripts
+// ---------------------------------------------------------------------------
+if (env.server.isDev) {
+  app.use(helmet({
+    contentSecurityPolicy: false, // relaxed for local dev test page
+  }));
+} else {
+  app.use(helmet());
+}
+
+// ---------------------------------------------------------------------------
+// CORS
+// In development: allow requests from Vite dev server (port 5173)
+// In production: configure for your deployed frontend domain
+// ---------------------------------------------------------------------------
+app.use(cors({
+  origin: env.server.isDev
+    ? ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000', 'http://127.0.0.1:3000']
+    : (process.env['FRONTEND_URL'] ?? 'http://localhost:5173'),
+  credentials: true, // Required for session cookies
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
+// ---------------------------------------------------------------------------
+// Body parsing
+// ---------------------------------------------------------------------------
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// ---------------------------------------------------------------------------
+// Session configuration
+//
+// WHY: We use express-session with the SQLite session store.
+// The session cookie holds a session ID; the actual session data
+// (including spotifyUserId) lives in the SQLite database.
+//
+// connect-sqlite3 creates a separate `sessions` table in our DB.
+// ---------------------------------------------------------------------------
+
+// Dynamic import because connect-sqlite3 needs session to be defined first
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const SQLiteStore = require('connect-sqlite3')(session);
+
+app.use(session({
+  store: new SQLiteStore({
+    db: 'spotify-companion.db',
+    dir: path.resolve(__dirname, '../data'),
+    table: 'sessions',
+  }),
+  secret: env.session.secret,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: !env.server.isDev, // HTTPS only in production
+    httpOnly: true,            // Prevent JS access to cookie
+    sameSite: 'lax',           // CSRF protection
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  },
+  name: 'sc.sid', // Custom name — don't use default 'connect.sid'
+}));
+
+// ---------------------------------------------------------------------------
+// Routes
+// ---------------------------------------------------------------------------
+app.use('/auth', authRouter);
+app.use('/spotify', spotifyRouter);
+app.use('/data', dataRouter);
+app.use('/ai', aiRouter);
+
+// Health check — useful for deployment monitoring
+app.get('/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'spotify-companion-backend',
+    timestamp: new Date().toISOString(),
+    environment: env.server.nodeEnv,
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Serve Frontend (React Single Page App) or test page
+// ---------------------------------------------------------------------------
+const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
+
+if (fs.existsSync(frontendDistPath)) {
+  console.log(`[server] Serving production React frontend from ${frontendDistPath}`);
+  app.use(express.static(frontendDistPath));
+  
+  app.get('*', (req, res, next) => {
+    // Skip API routes
+    if (
+      req.path.startsWith('/auth') || 
+      req.path.startsWith('/spotify') || 
+      req.path.startsWith('/data') || 
+      req.path.startsWith('/ai') || 
+      req.path.startsWith('/health')
+    ) {
+      return next();
+    }
+    res.sendFile(path.join(frontendDistPath, 'index.html'));
+  });
+} else if (env.server.isDev) {
+  app.get('/', (_req, res) => {
+    res.sendFile(path.resolve(__dirname, '../public/index.html'));
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Global error handler — must have 4 parameters for Express to recognize it
+// ---------------------------------------------------------------------------
+app.use((
+  err: Error,
+  _req: express.Request,
+  res: express.Response,
+  _next: express.NextFunction
+) => {
+  console.error('[error]', err.message, err.stack);
+
+  res.status(500).json({
+    error: 'INTERNAL_SERVER_ERROR',
+    message: env.server.isDev ? err.message : 'Something went wrong. Please try again.',
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Start server
+// ---------------------------------------------------------------------------
+const server = app.listen(env.server.port, '127.0.0.1', () => {
+  console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('  🎵 Spotify Companion AI — Backend Server');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log(`  Local:   http://127.0.0.1:${env.server.port}`);
+  console.log(`  Connect: http://127.0.0.1:${env.server.port}/auth/spotify`);
+  console.log(`  Health:  http://127.0.0.1:${env.server.port}/health`);
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('[server] SIGTERM received — shutting down gracefully');
+  server.close(() => {
+    console.log('[server] HTTP server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('\n[server] SIGINT received — shutting down');
+  server.close(() => process.exit(0));
+});
+
+export default app;

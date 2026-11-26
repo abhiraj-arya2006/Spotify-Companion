@@ -1,0 +1,18 @@
+{
+  "name": "Spotify Companion AI",
+  "short_name": "Companion AI",
+  "description": "Your personal AI-powered music curator integrated with Spotify",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0c",
+  "theme_color": "#10b981",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
