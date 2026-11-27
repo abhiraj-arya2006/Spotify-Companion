@@ -14,6 +14,7 @@ export default defineConfig({
     },
   },
   server: {
+    host: true, // Listen on all network addresses (0.0.0.0) so phone on same Wi-Fi can connect
     port: 5173,
     proxy: {
       // Proxy all /auth, /spotify, /data, /ai, /health calls to the backend

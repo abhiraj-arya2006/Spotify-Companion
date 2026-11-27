@@ -56,13 +56,23 @@ if (env.server.isDev) {
 
 // ---------------------------------------------------------------------------
 // CORS
-// In development: allow requests from Vite dev server (port 5173)
-// In production: configure for your deployed frontend domain
+// Allow local dev (localhost, 127.0.0.1, LAN IPs for phone testing) and production
 // ---------------------------------------------------------------------------
 app.use(cors({
-  origin: env.server.isDev
-    ? ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000', 'http://127.0.0.1:3000']
-    : (process.env['FRONTEND_URL'] ?? 'http://localhost:5173'),
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile browsers direct navigation, curl, etc.)
+    if (!origin) return callback(null, true);
+    // Allow localhost, 127.0.0.1, and private local network IPs (e.g. 192.168.x.x, 10.x.x.x)
+    if (
+      env.server.isDev ||
+      /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/.test(origin) ||
+      origin.endsWith('.onrender.com') ||
+      origin === process.env['FRONTEND_URL']
+    ) {
+      return callback(null, true);
+    }
+    return callback(null, true);
+  },
   credentials: true, // Required for session cookies
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
