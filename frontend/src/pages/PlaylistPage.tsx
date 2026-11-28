@@ -14,7 +14,6 @@ import {
   Trash2,
   RotateCcw,
   AlertTriangle,
-  Music2,
 } from 'lucide-react';
 import {
   generatePlaylistBlueprint,
@@ -26,6 +25,8 @@ import {
 import SpotlightCard from '@/components/SpotlightCard';
 import ShinyText from '@/components/ShinyText';
 import ClickSpark from '@/components/ClickSpark';
+import { TrackPlayButton } from '../player/TrackPlayButton';
+import type { PlayableTrack } from '../player/PlayerContext';
 
 const TRACK_COUNTS = [10, 20, 30, 50] as const;
 
@@ -70,6 +71,19 @@ export const PlaylistPage: React.FC = () => {
   const keptTracks = useMemo(
     () => (blueprint ? blueprint.tracks.filter(t => !removed.has(t.uri)) : []),
     [blueprint, removed]
+  );
+
+  // Same order as the list on screen, so the player's next/previous follow it
+  const playQueue = useMemo<PlayableTrack[]>(
+    () =>
+      (blueprint?.tracks ?? []).map(t => ({
+        id: t.trackId,
+        uri: t.uri,
+        name: t.name,
+        artists: t.artists,
+        image: t.albumImage ?? null,
+      })),
+    [blueprint]
   );
 
   const handleGenerate = async (customPrompt?: string) => {
@@ -353,13 +367,7 @@ export const PlaylistPage: React.FC = () => {
                   }`}
                 >
                   <span className="w-6 text-right text-xs text-neutral-500 pt-3 tabular-nums flex-shrink-0">{idx + 1}</span>
-                  {t.albumImage ? (
-                    <img src={t.albumImage} alt="" loading="lazy" className="w-11 h-11 rounded-lg object-cover flex-shrink-0" />
-                  ) : (
-                    <div className="w-11 h-11 rounded-lg bg-neutral-800 flex items-center justify-center flex-shrink-0">
-                      <Music2 className="w-4 h-4 text-neutral-500" />
-                    </div>
-                  )}
+                  <TrackPlayButton queue={playQueue} index={idx} />
                   <div className="min-w-0 flex-1">
                     <div className={`text-sm font-semibold text-white truncate ${isRemoved ? 'line-through' : ''}`}>{t.name}</div>
                     <div className="text-xs text-neutral-400 truncate">{t.artists.join(', ')}</div>

@@ -43,6 +43,10 @@ export const env = {
       'playlist-read-collaborative',
       'playlist-modify-public',
       'playlist-modify-private',
+      // In-app playback (Web Playback SDK, Premium only)
+      'streaming',
+      'user-read-playback-state',
+      'user-modify-playback-state',
     ].join(' '),
   },
   gemini: {

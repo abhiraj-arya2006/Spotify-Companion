@@ -51,7 +51,22 @@ if (env.server.isDev) {
     contentSecurityPolicy: false, // relaxed for local dev test page
   }));
 } else {
-  app.use(helmet());
+  // Production CSP: allow what the frontend actually loads — Google Fonts,
+  // Spotify artwork, the Web Playback SDK (sdk.scdn.co) and Spotify embeds.
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", 'https://sdk.scdn.co', 'https://open.spotify.com'],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        mediaSrc: ["'self'", 'https:', 'blob:'],
+        connectSrc: ["'self'", 'https://api.spotify.com', 'https://*.spotify.com', 'wss://*.spotify.com', 'https://*.scdn.co'],
+        frameSrc: ['https://open.spotify.com', 'https://sdk.scdn.co'],
+      },
+    },
+  }));
 }
 
 // ---------------------------------------------------------------------------

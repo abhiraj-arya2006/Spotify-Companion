@@ -4,6 +4,8 @@ import { NavRail, BottomDock } from './Sidebar';
 import { Header } from './Header';
 import { Aura } from './Aura';
 import { getTopTracks } from '../api/client';
+import { PlayerProvider, usePlayer } from '../player/PlayerContext';
+import { MiniPlayer } from '../player/MiniPlayer';
 import type { SpotifyUserProfile, SyncStatus } from '../types';
 
 interface LayoutProps {
@@ -14,8 +16,15 @@ interface LayoutProps {
   isSyncing: boolean;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ user, syncStatus, onLogout, onSync, isSyncing }) => {
+export const Layout: React.FC<LayoutProps> = props => (
+  <PlayerProvider>
+    <LayoutShell {...props} />
+  </PlayerProvider>
+);
+
+const LayoutShell: React.FC<LayoutProps> = ({ user, syncStatus, onLogout, onSync, isSyncing }) => {
   const [covers, setCovers] = useState<string[]>([]);
+  const { current } = usePlayer();
 
   // The Aura is tinted by what you're listening to right now.
   useEffect(() => {
@@ -37,11 +46,13 @@ export const Layout: React.FC<LayoutProps> = ({ user, syncStatus, onLogout, onSy
 
       <div className="relative z-10 flex min-h-screen flex-col lg:pl-[104px]">
         <Header user={user} syncStatus={syncStatus} onSync={onSync} onLogout={onLogout} isSyncing={isSyncing} />
-        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-32 lg:pb-12">
+        {/* Extra bottom room while the player bar is showing, so it never covers content */}
+        <main className={`flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 ${current ? 'pb-60 lg:pb-40' : 'pb-32 lg:pb-12'}`}>
           <Outlet />
         </main>
       </div>
 
+      <MiniPlayer />
       <BottomDock />
     </div>
   );

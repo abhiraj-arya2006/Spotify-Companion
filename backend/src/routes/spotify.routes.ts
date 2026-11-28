@@ -4,6 +4,7 @@
  * Spotify data endpoints — all protected by requireAuth middleware.
  *
  * GET /spotify/profile         → Current user's Spotify profile
+ * GET /spotify/player/token    → Access token + capability flags for in-app playback
  * GET /spotify/top/tracks      → User's top tracks (short/medium/long term)
  * GET /spotify/top/artists     → User's top artists
  * GET /spotify/library/tracks  → User's saved library tracks
@@ -59,6 +60,31 @@ spotifyRouter.get('/profile', async (_req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// ---------------------------------------------------------------------------
+// GET /spotify/player/token
+//
+// The Web Playback SDK runs in the browser and needs the user's own access
+// token. Also reports whether in-app playback is possible: Spotify only allows
+// it for Premium accounts that granted the `streaming` scope.
+// ---------------------------------------------------------------------------
+
+spotifyRouter.get('/player/token', (_req, res) => {
+  const { accessToken, spotifyUserId } = getAuthLocals(res);
+  const tokens = getTokens(spotifyUserId);
+  const scopes = (tokens?.scope ?? '').split(' ');
+  const isPremium = getUserById(spotifyUserId)?.product === 'premium';
+  const hasStreamingScope = scopes.includes('streaming') && scopes.includes('user-modify-playback-state');
+
+  res.json({
+    accessToken,
+    expiresAt: tokens?.expires_at ?? null,
+    isPremium,
+    canStream: isPremium && hasStreamingScope,
+    // Premium, but logged in before playback scopes were added
+    needsReconnect: isPremium && !hasStreamingScope,
+  });
 });
 
 // ---------------------------------------------------------------------------

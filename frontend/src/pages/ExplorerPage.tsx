@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Music, 
   User, 
@@ -11,6 +11,16 @@ import {
 } from 'lucide-react';
 import { getTopTracks, getTopArtists, getLibraryTracks } from '../api/client';
 import type { SpotifyTrack, SpotifyArtist } from '../types';
+import { TrackPlayButton } from '../player/TrackPlayButton';
+import type { PlayableTrack } from '../player/PlayerContext';
+
+const toPlayable = (t: SpotifyTrack): PlayableTrack => ({
+  id: t.id,
+  uri: `spotify:track:${t.id}`,
+  name: t.name,
+  artists: t.artists.map(a => a.name),
+  image: t.album?.images?.[0]?.url ?? null,
+});
 
 export const ExplorerPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'tracks' | 'artists' | 'saved'>('tracks');
@@ -18,6 +28,7 @@ export const ExplorerPage: React.FC = () => {
   const [tracks, setTracks] = useState<SpotifyTrack[]>([]);
   const [artists, setArtists] = useState<SpotifyArtist[]>([]);
   const [loading, setLoading] = useState(true);
+  const playQueue = useMemo(() => tracks.map(toPlayable), [tracks]);
 
   useEffect(() => {
     loadContent();
@@ -208,13 +219,7 @@ export const ExplorerPage: React.FC = () => {
                 {idx + 1}
               </span>
 
-              <div className="w-12 h-12 rounded-xl bg-neutral-800 overflow-hidden flex-shrink-0 relative">
-                <img
-                  src={track.album?.images?.[0]?.url || ''}
-                  alt={track.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
+              <TrackPlayButton queue={playQueue} index={idx} className="h-12 w-12 rounded-xl" />
 
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-bold text-white truncate">
