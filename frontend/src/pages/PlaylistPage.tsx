@@ -1,4 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { SESSION_TRACK_COUNT, type SessionRequest } from '../lib/dayparts';
 import {
   ListMusic,
   Sparkles,
@@ -28,7 +30,7 @@ import ClickSpark from '@/components/ClickSpark';
 import { TrackPlayButton } from '../player/TrackPlayButton';
 import type { PlayableTrack } from '../player/PlayerContext';
 
-const TRACK_COUNTS = [10, 20, 30, 50] as const;
+const TRACK_COUNTS = [10, 15, 20, 30, 50] as const;
 
 const DISCOVERY_OPTIONS: Array<{ value: DiscoveryLevel; label: string; hint: string }> = [
   { value: 'familiar', label: 'Familiar', hint: 'Mostly artists you already love' },
@@ -86,9 +88,14 @@ export const PlaylistPage: React.FC = () => {
     [blueprint]
   );
 
-  const handleGenerate = async (customPrompt?: string) => {
+  const handleGenerate = async (
+    customPrompt?: string,
+    options?: { trackCount: number; discovery: DiscoveryLevel },
+  ) => {
     const text = (customPrompt ?? prompt).trim();
     if (!text || generating) return;
+    const count = options?.trackCount ?? trackCount;
+    const level = options?.discovery ?? discovery;
 
     setGenerating(true);
     setGenError(null);
@@ -97,7 +104,7 @@ export const PlaylistPage: React.FC = () => {
     setCreatedResult(null);
 
     try {
-      const bp = await generatePlaylistBlueprint({ prompt: text, trackCount, discoveryLevel: discovery });
+      const bp = await generatePlaylistBlueprint({ prompt: text, trackCount: count, discoveryLevel: level });
       setBlueprint(bp);
       setPlaylistTitle(bp.title);
       setPlaylistDesc(bp.description || `Curated by Spotify Companion AI: ${text}`);
@@ -108,6 +115,24 @@ export const PlaylistPage: React.FC = () => {
       setGenerating(false);
     }
   };
+
+  // One-tap session from the dashboard's "Right now" panel: generate immediately
+  const location = useLocation();
+  const navigate = useNavigate();
+  const consumedSession = useRef<string | null>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const session = (location.state as { session?: SessionRequest } | null)?.session;
+    if (!session || consumedSession.current === location.key) return;
+    consumedSession.current = location.key;
+    requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    // Clear the router state so a refresh doesn't start another session
+    navigate('.', { replace: true, state: null });
+    setPrompt(session.prompt);
+    setTrackCount(SESSION_TRACK_COUNT);
+    setDiscovery(session.discovery);
+    handleGenerate(session.prompt, { trackCount: SESSION_TRACK_COUNT, discovery: session.discovery });
+  }, [location.state]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleRemoved = (uri: string) => {
     setRemoved(prev => {
@@ -275,6 +300,9 @@ export const PlaylistPage: React.FC = () => {
           </ClickSpark>
         </div>
       </div>
+
+      {/* Scroll anchor for one-tap sessions */}
+      <div ref={resultsRef} className="scroll-mt-24 mb-0!" aria-hidden="true" />
 
       {/* Generating */}
       {generating && (

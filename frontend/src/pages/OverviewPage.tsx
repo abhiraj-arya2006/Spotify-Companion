@@ -5,6 +5,7 @@ import { getProfile, getMusicDNA, getTopTracks, triggerSync } from '../api/clien
 import CircularGallery from '@/components/CircularGallery';
 import BlurText from '@/components/BlurText';
 import CountUp from '@/components/CountUp';
+import { RightNow } from '../components/RightNow';
 import type { SpotifyUserProfile, MusicDNA, SpotifyTrack, SyncStatus } from '../types';
 
 interface OverviewPageProps {
@@ -182,6 +183,9 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ syncStatus, onRefres
           </div>
         )}
       </section>
+
+      {/* ---------------- Soundtrack for this time of day ---------------- */}
+      <RightNow />
 
       {/* ---------------- Taste readout ---------------- */}
       {dna && (

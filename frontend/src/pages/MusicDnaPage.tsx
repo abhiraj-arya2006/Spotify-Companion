@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { Dna, RefreshCw } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Dna, RefreshCw, Share2 } from 'lucide-react';
+import { StoryCardDialog } from '../components/StoryCardDialog';
 import { getMusicDNA, getMusicDnaHistory, refreshMusicDNA, triggerSync } from '../api/client';
 import type { GenreDrift, MusicDNA, ShiftArtist, TasteSnapshot } from '../types';
 
@@ -8,6 +9,8 @@ export const MusicDnaPage: React.FC = () => {
   const [history, setHistory] = useState<TasteSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showStory, setShowStory] = useState(false);
+  const closeStory = useCallback(() => setShowStory(false), []);
 
   useEffect(() => {
     loadDNA();
@@ -82,6 +85,14 @@ export const MusicDnaPage: React.FC = () => {
       <header>
         <div className="flex items-start justify-between gap-4">
           <p className="text-sm text-neutral-400">You listen like</p>
+          <div className="flex shrink-0 gap-2">
+          <button
+            onClick={() => setShowStory(true)}
+            className="inline-flex shrink-0 items-center gap-2 rounded-full bg-phosphor px-4 py-2 text-xs font-bold text-ink transition-transform active:scale-[0.97]"
+          >
+            <Share2 className="h-3.5 w-3.5" />
+            Share story
+          </button>
           <button
             onClick={handleRefresh}
             disabled={refreshing}
@@ -90,7 +101,9 @@ export const MusicDnaPage: React.FC = () => {
             <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
             {refreshing ? 'Updating…' : 'Update'}
           </button>
+          </div>
         </div>
+        {showStory && <StoryCardDialog dna={dna} onClose={closeStory} />}
         <h1 className="mt-2 font-display text-[clamp(2.5rem,8vw,5.5rem)] font-black leading-[0.92] tracking-[-0.045em] text-bone">
           {p.type.replace(/^The /, 'the ')}
         </h1>
