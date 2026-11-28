@@ -204,6 +204,16 @@ function initSchema(db: Database.Database): void {
     )
   `);
 
+  // Artist metadata cache — stores AI-enriched genres and popularity when Spotify Web API omits them
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS artist_metadata_cache (
+      artist_name TEXT PRIMARY KEY,
+      genres      TEXT NOT NULL, -- JSON array of strings
+      popularity  INTEGER NOT NULL,
+      updated_at  INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    )
+  `);
+
   // Conversation history for AI chat (Phase 6)
   db.exec(`
     CREATE TABLE IF NOT EXISTS chat_history (

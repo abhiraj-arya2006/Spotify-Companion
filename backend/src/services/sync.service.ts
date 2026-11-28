@@ -18,6 +18,7 @@
  */
 
 import { getDb } from '../db/database';
+import { enrichUserData } from './ai/enrichment.service';
 import {
   getUserTopTracks,
   getUserTopArtists,
@@ -73,6 +74,13 @@ export async function syncUserData(
   await syncSavedTracks(userId, accessToken)
     .then(n => { counts.savedTracks = n; })
     .catch(e => { errors.push(`saved_tracks: ${e.message}`); });
+
+  // Enrich artist genres and popularity with Gemini if Spotify omitted them
+  try {
+    await enrichUserData(userId);
+  } catch (enrichErr: any) {
+    console.warn(`[sync] Metadata enrichment warning: ${enrichErr?.message}`);
+  }
 
   const durationMs = Date.now() - start;
   const success = errors.length === 0;

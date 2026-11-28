@@ -400,12 +400,21 @@ function dedupArtists(artists: CachedArtist[]): CachedArtist[] {
 function calcMainstreamScore(tracks: CachedTrack[], artists: CachedArtist[]): number {
   if (tracks.length === 0 && artists.length === 0) return 50;
 
-  const trackAvg  = tracks.length > 0
-    ? tracks.reduce((s, t) => s + (t.popularity ?? 50), 0) / tracks.length
-    : 50;
-  const artistAvg = artists.length > 0
-    ? artists.reduce((s, a) => s + (a.popularity ?? 50), 0) / artists.length
-    : 50;
+  // Use valid positive popularity ratings
+  const validTracks = tracks.filter(t => typeof t.popularity === 'number' && t.popularity > 0);
+  const validArtists = artists.filter(a => typeof a.popularity === 'number' && a.popularity > 0);
+
+  if (validTracks.length === 0 && validArtists.length === 0) {
+    return 50;
+  }
+
+  const trackAvg = validTracks.length > 0
+    ? validTracks.reduce((s, t) => s + t.popularity, 0) / validTracks.length
+    : (validArtists.length > 0 ? validArtists.reduce((s, a) => s + a.popularity, 0) / validArtists.length : 50);
+
+  const artistAvg = validArtists.length > 0
+    ? validArtists.reduce((s, a) => s + a.popularity, 0) / validArtists.length
+    : trackAvg;
 
   // Weighted: tracks 60%, artists 40%
   return Math.round(trackAvg * 0.6 + artistAvg * 0.4);

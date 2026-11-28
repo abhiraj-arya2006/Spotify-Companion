@@ -96,7 +96,7 @@ authRouter.get('/spotify', (req, res) => {
     redirect_uri: redirectUri,
     scope: env.spotify.scopes,
     state,
-    // show_dialog: 'true', // uncomment to always show Spotify auth dialog
+    show_dialog: 'true', // Always show Spotify dialog so different users can log into their own account
   });
 
   const authUrl = `https://accounts.spotify.com/authorize?${params.toString()}`;

@@ -14,6 +14,7 @@ import { Router } from 'express';
 import { requireAuth, getAuthLocals } from '../middleware/auth.middleware';
 import { syncUserData, getLastSyncTime, hasCachedData } from '../services/sync.service';
 import { generateMusicDNA, getStoredMusicDNA, getMusicDnaHistory } from '../services/music-dna.service';
+import { enrichUserData } from '../services/ai/enrichment.service';
 
 export const dataRouter = Router();
 dataRouter.use(requireAuth);
@@ -72,21 +73,28 @@ dataRouter.get('/sync/status', (_req, res) => {
 // GET /data/music-dna — get the music DNA profile
 // ---------------------------------------------------------------------------
 
-dataRouter.get('/music-dna', (_req, res, next) => {
+dataRouter.get('/music-dna', async (_req, res, next) => {
   try {
     const { spotifyUserId } = getAuthLocals(res);
 
     // Try stored first
     let dna = getStoredMusicDNA(spotifyUserId);
 
-    // Generate fresh if not stored, or if stored before taste-shift analysis existed
-    if (!dna || !dna.taste) {
+    // If stored DNA has missing genres or default fallback scores (due to Spotify API stripping fields), enrich and regenerate
+    const isUnenriched = !dna || !dna.taste || dna.topGenres.length === 0 || (dna.mainstreamScore === 30 && dna.artistDiversityScore === 0);
+
+    if (isUnenriched) {
       if (!hasCachedData(spotifyUserId)) {
         res.status(404).json({
           error: 'NO_DATA',
           message: 'No Spotify data synced yet. Please run POST /data/sync first.',
         });
         return;
+      }
+      try {
+        await enrichUserData(spotifyUserId);
+      } catch (err: any) {
+        console.warn(`[data] Enrichment warning: ${err?.message}`);
       }
       dna = generateMusicDNA(spotifyUserId);
     }
