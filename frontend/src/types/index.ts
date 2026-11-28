@@ -76,9 +76,40 @@ export interface ListeningPersonality {
   traits: string[];
 }
 
+export interface GenreDrift {
+  name: string;
+  thenRank: number | null;
+  nowRank: number | null;
+}
+
+export interface ShiftArtist {
+  artist_id: string;
+  artist_name: string;
+  image_url: string | null;
+  rank: number;
+}
+
+export interface TasteShift {
+  genreDrift: GenreDrift[];
+  risingArtists: ShiftArtist[];
+  fadingArtists: ShiftArtist[];
+  deepestCut: TrackProfile | null;
+}
+
+export interface TasteSnapshot {
+  date: string;
+  archetype: string;
+  mainstream: number;
+  diversity: number;
+  loyalty: number;
+  evolving: number;
+  topGenres: string[];
+}
+
 export interface MusicDNA {
   userId: string;
   generatedAt: number;
+  taste?: TasteShift;
   topGenres: GenreProfile[];
   genreCategories: {
     dominant: string[];

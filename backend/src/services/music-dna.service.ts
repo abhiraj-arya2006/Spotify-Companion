@@ -64,9 +64,42 @@ export interface ListeningPersonality {
   traits: string[];     // bullet-point characteristics
 }
 
+export interface GenreDrift {
+  name: string;
+  thenRank: number | null; // rank among all-time top genres (1-based), null = not in top list
+  nowRank: number | null;  // rank among this month's top genres
+}
+
+export interface ShiftArtist {
+  artist_id: string;
+  artist_name: string;
+  image_url: string | null;
+  rank: number; // short-term rank for rising, long-term rank for fading
+}
+
+export interface TasteShift {
+  genreDrift: GenreDrift[];        // genres in the top N of either era
+  risingArtists: ShiftArtist[];    // in this month's top, absent from all-time
+  fadingArtists: ShiftArtist[];    // all-time favourites missing from recent listening
+  deepestCut: TrackProfile | null; // least-popular track in current rotation
+}
+
+export interface TasteSnapshot {
+  date: string;
+  archetype: string;
+  mainstream: number;
+  diversity: number;
+  loyalty: number;
+  evolving: number;
+  topGenres: string[];
+}
+
 export interface MusicDNA {
   userId: string;
   generatedAt: number;
+
+  // How taste has moved between all-time and right now
+  taste: TasteShift;
 
   // Genre intelligence
   topGenres: GenreProfile[];           // top 15 weighted genres
@@ -160,6 +193,7 @@ export function generateMusicDNA(userId: string): MusicDNA | null {
   const dna: MusicDNA = {
     userId,
     generatedAt: Date.now(),
+    taste: analyzeTasteShift(shortArtists, mediumArtists, longArtists, [...shortTracks, ...mediumTracks]),
     topGenres: topGenres.slice(0, 15),
     genreCategories: categorizeGenres(topGenres),
     coreArtists,
@@ -247,6 +281,73 @@ function categorizeGenres(genres: GenreProfile[]): MusicDNA['genreCategories'] {
     dominant:   sorted.slice(0, 3).map(g => g.name),
     secondary:  sorted.slice(3, 8).map(g => g.name),
     occasional: sorted.slice(8, 15).map(g => g.name),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Taste shift — all-time vs. this month
+// ---------------------------------------------------------------------------
+
+const DRIFT_TOP_N = 7;
+
+function rankGenres(artists: CachedArtist[]): string[] {
+  const scores = new Map<string, number>();
+  artists.forEach((artist, i) => {
+    const rankWeight = 1 + (artists.length - i) / artists.length;
+    artist.genres.forEach(g => {
+      const name = normalizeGenre(g);
+      scores.set(name, (scores.get(name) ?? 0) + rankWeight);
+    });
+  });
+  return [...scores.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => name);
+}
+
+function analyzeTasteShift(
+  short: CachedArtist[],
+  medium: CachedArtist[],
+  long: CachedArtist[],
+  recentTracks: CachedTrack[]
+): TasteShift {
+  const thenTop = rankGenres(long).slice(0, DRIFT_TOP_N);
+  const nowTop  = rankGenres(short).slice(0, DRIFT_TOP_N);
+  const genreDrift: GenreDrift[] = [...new Set([...thenTop, ...nowTop])].map(name => ({
+    name,
+    thenRank: thenTop.includes(name) ? thenTop.indexOf(name) + 1 : null,
+    nowRank:  nowTop.includes(name) ? nowTop.indexOf(name) + 1 : null,
+  }));
+
+  const toShift = (a: CachedArtist, rank: number): ShiftArtist => ({
+    artist_id: a.artist_id,
+    artist_name: a.artist_name,
+    image_url: a.image_url,
+    rank,
+  });
+
+  const longIds = new Set(long.map(a => a.artist_id));
+  const recentIds = new Set([...short, ...medium].map(a => a.artist_id));
+
+  const risingArtists = short
+    .map((a, i) => ({ a, rank: i + 1 }))
+    .filter(({ a }) => !longIds.has(a.artist_id))
+    .slice(0, 6)
+    .map(({ a, rank }) => toShift(a, rank));
+
+  const fadingArtists = long
+    .map((a, i) => ({ a, rank: i + 1 }))
+    .filter(({ a }) => !recentIds.has(a.artist_id))
+    .slice(0, 6)
+    .map(({ a, rank }) => toShift(a, rank));
+
+  // popularity 0 usually means a local file or missing data — ignore it
+  const deepest = recentTracks
+    .filter(t => (t.popularity ?? 0) > 0)
+    .sort((a, b) => a.popularity - b.popularity)[0];
+
+  return {
+    genreDrift,
+    risingArtists,
+    fadingArtists,
+    deepestCut: deepest ? toTrackProfile(deepest, 'top_short') : null,
   };
 }
 
@@ -424,6 +525,52 @@ function persistMusicDNA(userId: string, dna: MusicDNA): void {
       last_synced_at = excluded.last_synced_at,
       updated_at     = excluded.updated_at
   `).run(userId, JSON.stringify(dna), dna.generatedAt, dna.generatedAt);
+
+  // One snapshot per day: later regenerations on the same day overwrite it
+  db.prepare(`
+    INSERT INTO music_profile_history
+      (user_id, snapshot_date, archetype, mainstream, diversity, loyalty, evolving, top_genres)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(user_id, snapshot_date) DO UPDATE SET
+      archetype  = excluded.archetype,
+      mainstream = excluded.mainstream,
+      diversity  = excluded.diversity,
+      loyalty    = excluded.loyalty,
+      evolving   = excluded.evolving,
+      top_genres = excluded.top_genres
+  `).run(
+    userId,
+    new Date(dna.generatedAt).toISOString().slice(0, 10),
+    dna.listeningPersonality.type,
+    dna.mainstreamScore,
+    dna.artistDiversityScore,
+    dna.artistLoyaltyScore,
+    dna.evolvingTasteScore,
+    JSON.stringify(dna.topGenres.slice(0, 5).map(g => g.name)),
+  );
+}
+
+export function getMusicDnaHistory(userId: string, limit = 30): TasteSnapshot[] {
+  const rows = getDb().prepare(`
+    SELECT snapshot_date, archetype, mainstream, diversity, loyalty, evolving, top_genres
+    FROM music_profile_history
+    WHERE user_id = ?
+    ORDER BY snapshot_date DESC
+    LIMIT ?
+  `).all(userId, limit) as Array<{
+    snapshot_date: string; archetype: string; mainstream: number; diversity: number;
+    loyalty: number; evolving: number; top_genres: string;
+  }>;
+
+  return rows.reverse().map(r => ({
+    date: r.snapshot_date,
+    archetype: r.archetype,
+    mainstream: r.mainstream,
+    diversity: r.diversity,
+    loyalty: r.loyalty,
+    evolving: r.evolving,
+    topGenres: JSON.parse(r.top_genres) as string[],
+  }));
 }
 
 export function getStoredMusicDNA(userId: string): MusicDNA | null {

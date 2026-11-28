@@ -1,22 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  Dna, 
-  Sparkles, 
-  TrendingUp, 
-  Compass, 
-  Heart, 
-  Flame, 
-  Layers, 
-  RefreshCw, 
-  CheckCircle2,
-  ExternalLink
-} from 'lucide-react';
-import { getMusicDNA, refreshMusicDNA, triggerSync } from '../api/client';
-import type { MusicDNA } from '../types';
-import CountUp from '@/components/CountUp';
+import { Dna, RefreshCw } from 'lucide-react';
+import { getMusicDNA, getMusicDnaHistory, refreshMusicDNA, triggerSync } from '../api/client';
+import type { GenreDrift, MusicDNA, ShiftArtist, TasteSnapshot } from '../types';
 
 export const MusicDnaPage: React.FC = () => {
   const [dna, setDna] = useState<MusicDNA | null>(null);
+  const [history, setHistory] = useState<TasteSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -24,11 +13,14 @@ export const MusicDnaPage: React.FC = () => {
     loadDNA();
   }, []);
 
+  const loadHistory = () =>
+    getMusicDnaHistory().then(setHistory).catch(() => setHistory([]));
+
   const loadDNA = async () => {
     try {
       setLoading(true);
-      const data = await getMusicDNA();
-      setDna(data);
+      setDna(await getMusicDNA());
+      await loadHistory();
     } catch (e) {
       console.error('Failed to load Music DNA:', e);
     } finally {
@@ -39,10 +31,9 @@ export const MusicDnaPage: React.FC = () => {
   const handleRefresh = async () => {
     try {
       setRefreshing(true);
-      // Run sync first to ensure freshness, then refresh DNA
       await triggerSync();
-      const updated = await refreshMusicDNA();
-      setDna(updated);
+      setDna(await refreshMusicDNA());
+      await loadHistory();
     } catch (e) {
       console.error('Failed to refresh DNA:', e);
     } finally {
@@ -52,10 +43,10 @@ export const MusicDnaPage: React.FC = () => {
 
   if (loading && !dna) {
     return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
-          <div className="text-sm text-neutral-400">Synthesizing your Music DNA...</div>
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-phosphor">
+          <span className="eq scale-150" aria-hidden="true"><span /><span /><span /><span /></span>
+          <div className="text-sm text-neutral-400">Reading your listening history…</div>
         </div>
       </div>
     );
@@ -63,271 +54,446 @@ export const MusicDnaPage: React.FC = () => {
 
   if (!dna) {
     return (
-      <div className="p-8 rounded-[28px] bg-glass backdrop-blur-xl border border-white/5 text-center max-w-lg mx-auto mt-12">
-        <Dna className="w-12 h-12 text-emerald-400 mx-auto mb-4 animate-pulse" />
-        <h2 className="text-xl font-bold text-white mb-2">No Music DNA Found</h2>
-        <p className="text-sm text-neutral-400 mb-6">
-          We haven't processed your Spotify listening history yet. Click below to fetch your library and analyze your taste profile.
+      <div className="mx-auto mt-16 max-w-md text-center">
+        <Dna className="mx-auto mb-5 h-10 w-10 text-phosphor" />
+        <h1 className="font-display text-2xl font-bold text-bone">No Music DNA yet</h1>
+        <p className="mt-3 text-sm leading-relaxed text-neutral-400">
+          Sync your Spotify library and Companion will build your taste profile from what you actually play.
         </p>
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="px-6 py-3 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-sm transition-all"
+          className="mt-7 rounded-full bg-phosphor px-6 py-3 text-sm font-bold text-ink transition-transform active:scale-[0.98] disabled:opacity-60"
         >
-          {refreshing ? 'Processing Library...' : 'Generate Music DNA'}
+          {refreshing ? 'Syncing your library…' : 'Sync and build my DNA'}
         </button>
       </div>
     );
   }
 
+  const p = dna.listeningPersonality;
+  const taste = dna.taste;
+
   return (
-    <div className="space-y-8 animate-fadeIn">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:items-end justify-between gap-6 pt-6 pb-2">
-        <div>
-          <h1 className="font-display font-black text-[clamp(2.4rem,6vw,4.5rem)] leading-[0.95] tracking-[-0.04em] text-bone">
-            Your Music DNA
-          </h1>
-          <p className="text-base text-neutral-300 mt-4 max-w-xl">
-            Calculated from {dna.dataQuality.topTracksCount} tracks, {dna.dataQuality.topArtistsCount} artists, and {dna.dataQuality.savedTracksCount} saved library entries.
-          </p>
+    <div className="animate-fadeIn space-y-20 pb-8 pt-6">
+      {/* ---------------------------------------------------------------- */}
+      {/* Archetype — the page opens with who you are as a listener        */}
+      {/* ---------------------------------------------------------------- */}
+      <header>
+        <div className="flex items-start justify-between gap-4">
+          <p className="text-sm text-neutral-400">You listen like</p>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="inline-flex shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-neutral-200 transition-colors hover:bg-white/10 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Updating…' : 'Update'}
+          </button>
         </div>
+        <h1 className="mt-2 font-display text-[clamp(2.5rem,8vw,5.5rem)] font-black leading-[0.92] tracking-[-0.045em] text-bone">
+          {p.type.replace(/^The /, 'the ')}
+        </h1>
+        <p className="mt-6 max-w-[60ch] text-base leading-relaxed text-neutral-300 sm:text-lg">{p.description}</p>
+        <ul className="mt-6 flex max-w-3xl flex-wrap gap-x-6 gap-y-2">
+          {p.traits.map(t => (
+            <li key={t} className="flex items-center gap-2 text-sm text-neutral-400">
+              <span className="h-1 w-3 rounded-full bg-phosphor/70" aria-hidden="true" />
+              {t}
+            </li>
+          ))}
+        </ul>
+        <p className="mt-8 text-xs text-neutral-500">
+          Built from {dna.dataQuality.topTracksCount} top tracks, {dna.dataQuality.topArtistsCount} artists and{' '}
+          {dna.dataQuality.savedTracksCount} saved songs.
+        </p>
+      </header>
 
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-200 border border-white/10 text-xs font-semibold transition-all disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-          <span>{refreshing ? 'Recalculating...' : 'Refresh DNA'}</span>
-        </button>
-      </div>
+      {/* ---------------------------------------------------------------- */}
+      {/* Spectrums                                                        */}
+      {/* ---------------------------------------------------------------- */}
+      <section aria-labelledby="spectrum-heading">
+        <SectionHeading id="spectrum-heading" title="Where your taste sits" />
+        <div className="mt-8 max-w-3xl space-y-9">
+          <Spectrum left="Underground" right="Mainstream" value={dna.mainstreamScore} />
+          <Spectrum left="Focused" right="Eclectic" value={dna.artistDiversityScore} />
+          <Spectrum left="Restless" right="Loyal" value={dna.artistLoyaltyScore} />
+        </div>
+      </section>
 
-      {/* Personality Archetype Banner */}
-      <div className="p-6 sm:p-8 rounded-[28px] bg-gradient-to-br from-phosphor/10 via-glass to-ultraviolet/10 border border-emerald-500/20 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none" />
-
-        <div className="relative z-10 max-w-3xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-semibold mb-4">
-            <Flame className="w-3.5 h-3.5" />
-            <span>Listening Personality Archetype</span>
+      {/* ---------------------------------------------------------------- */}
+      {/* Genre drift — the page's centrepiece                             */}
+      {/* ---------------------------------------------------------------- */}
+      {taste && taste.genreDrift.length > 0 && (
+        <section aria-labelledby="drift-heading">
+          <SectionHeading
+            id="drift-heading"
+            title="How your genres moved"
+            note="Your all-time top genres on the left, the last four weeks on the right. Tap a genre to follow it."
+          />
+          <div className="mt-8 rounded-[28px] border border-white/[0.06] bg-glass p-4 backdrop-blur-xl sm:p-8">
+            <GenreDriftChart drift={taste.genreDrift} />
           </div>
+        </section>
+      )}
 
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-3">
-            {dna.listeningPersonality.type}
-          </h2>
+      {/* ---------------------------------------------------------------- */}
+      {/* Artists in motion                                                */}
+      {/* ---------------------------------------------------------------- */}
+      {taste && (taste.risingArtists.length > 0 || taste.fadingArtists.length > 0) && (
+        <section aria-labelledby="motion-heading">
+          <SectionHeading id="motion-heading" title="Artists on the move" />
+          <div className="mt-8 grid gap-12 md:grid-cols-2">
+            <ArtistColumn
+              title="New in your rotation"
+              empty="Nobody new this month. Your current favourites are old friends."
+              artists={taste.risingArtists}
+              caption={a => `#${a.rank} this month`}
+              accent="phosphor"
+            />
+            <ArtistColumn
+              title="Drifted away"
+              empty="None of your all-time favourites have gone quiet."
+              artists={taste.fadingArtists}
+              caption={a => `#${a.rank} all time, absent lately`}
+              accent="ultraviolet"
+            />
+          </div>
+        </section>
+      )}
 
-          <p className="text-sm sm:text-base text-neutral-300 leading-relaxed mb-6">
-            {dna.listeningPersonality.description}
-          </p>
-
-          <div className="flex flex-wrap gap-2">
-            {dna.listeningPersonality.traits.map((trait, idx) => (
-              <div 
-                key={idx}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-neutral-200"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-                <span>{trait}</span>
+      {/* ---------------------------------------------------------------- */}
+      {/* Deepest cut                                                      */}
+      {/* ---------------------------------------------------------------- */}
+      {taste?.deepestCut && (
+        <section aria-labelledby="cut-heading">
+          <SectionHeading id="cut-heading" title="Your deepest cut" />
+          <a
+            href={`https://open.spotify.com/track/${taste.deepestCut.track_id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="group mt-8 flex max-w-2xl items-center gap-5"
+          >
+            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-neutral-800 shadow-[0_20px_40px_-20px_rgb(0_0_0/0.8)] sm:h-24 sm:w-24">
+              {taste.deepestCut.album_image && (
+                <img src={taste.deepestCut.album_image} alt="" className="h-full w-full object-cover" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="truncate font-display text-lg font-bold text-bone group-hover:text-phosphor sm:text-xl">
+                {taste.deepestCut.track_name}
               </div>
+              <div className="truncate text-sm text-neutral-300">{taste.deepestCut.artist_names.join(', ')}</div>
+              <p className="mt-2 text-sm text-neutral-500">
+                Popularity {taste.deepestCut.popularity} out of 100. The least-known song you keep coming back to.
+              </p>
+            </div>
+          </a>
+        </section>
+      )}
+
+      {/* ---------------------------------------------------------------- */}
+      {/* Timeline                                                         */}
+      {/* ---------------------------------------------------------------- */}
+      <section aria-labelledby="timeline-heading">
+        <SectionHeading id="timeline-heading" title="Your taste over time" />
+        {history.length < 2 ? (
+          <p className="mt-6 max-w-[60ch] text-sm leading-relaxed text-neutral-400">
+            Your timeline starts {history.length === 1 ? `on ${formatDate(history[0].date)}` : 'today'}. Each day you
+            sync adds a point, so come back after your next sync to see how your taste moves.
+          </p>
+        ) : (
+          <Timeline history={history} />
+        )}
+      </section>
+
+      {/* ---------------------------------------------------------------- */}
+      {/* Core artists                                                     */}
+      {/* ---------------------------------------------------------------- */}
+      {dna.coreArtists.length > 0 && (
+        <section aria-labelledby="core-heading">
+          <SectionHeading
+            id="core-heading"
+            title="Always in rotation"
+            note="Artists who show up in your last month, last six months and all-time listening."
+          />
+          <ul className="mt-8 grid grid-cols-3 gap-x-4 gap-y-8 sm:grid-cols-4 lg:grid-cols-6">
+            {dna.coreArtists.slice(0, 12).map(a => (
+              <li key={a.artist_id} className="text-center">
+                <Avatar name={a.artist_name} src={a.image_url} className="mx-auto h-20 w-20 sm:h-24 sm:w-24" />
+                <div className="mt-3 truncate text-sm font-semibold text-bone">{a.artist_name}</div>
+                <div className="text-xs text-neutral-500">
+                  {a.loyaltyScore === 3 ? 'Every era' : `${a.loyaltyScore} of 3 eras`}
+                </div>
+              </li>
             ))}
-          </div>
-        </div>
+          </ul>
+        </section>
+      )}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Pieces
+// ---------------------------------------------------------------------------
+
+const SectionHeading: React.FC<{ id: string; title: string; note?: string }> = ({ id, title, note }) => (
+  <div>
+    <h2 id={id} className="font-display text-xl font-bold tracking-[-0.03em] text-bone sm:text-2xl">
+      {title}
+    </h2>
+    {note && <p className="mt-2 max-w-[60ch] text-sm text-neutral-400">{note}</p>}
+  </div>
+);
+
+function leanWord(value: number, left: string, right: string): string {
+  if (value >= 45 && value <= 55) return 'Right in the middle';
+  const side = value > 50 ? right : left;
+  const strength = Math.abs(value - 50);
+  if (strength > 30) return `Strongly ${side.toLowerCase()}`;
+  if (strength > 15) return `Leans ${side.toLowerCase()}`;
+  return `Slightly ${side.toLowerCase()}`;
+}
+
+const Spectrum: React.FC<{ left: string; right: string; value: number }> = ({ left, right, value }) => {
+  const v = Math.max(0, Math.min(100, value));
+  return (
+    <div>
+      <div className="flex items-baseline justify-between text-sm">
+        <span className={v < 50 ? 'font-semibold text-bone' : 'text-neutral-500'}>{left}</span>
+        <span className="text-xs text-neutral-400">{leanWord(v, left, right)}</span>
+        <span className={v > 50 ? 'font-semibold text-bone' : 'text-neutral-500'}>{right}</span>
       </div>
-
-      {/* Four Core Dimension Gauges */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Mainstream */}
-        <div className="p-5 rounded-2xl bg-glass backdrop-blur-xl border border-white/5">
-          <div className="flex items-center justify-between text-neutral-400 mb-2">
-            <span className="text-xs font-semibold">Mainstream</span>
-            <TrendingUp className="w-4 h-4 text-emerald-400" />
-          </div>
-          <div className="font-display text-3xl font-black text-bone mb-2 tabular-nums"><CountUp to={dna.mainstreamScore} suffix="%" duration={1.4} /></div>
-          <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden mb-2">
-            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${dna.mainstreamScore}%` }} />
-          </div>
-          <div className="text-[11px] text-neutral-500">
-            {dna.mainstreamScore > 50 ? 'Prefers prominent & charting tracks' : 'Prefers niche & independent music'}
-          </div>
-        </div>
-
-        {/* Artist Diversity */}
-        <div className="p-5 rounded-2xl bg-glass backdrop-blur-xl border border-white/5">
-          <div className="flex items-center justify-between text-neutral-400 mb-2">
-            <span className="text-xs font-semibold">Diversity</span>
-            <Compass className="w-4 h-4 text-emerald-400" />
-          </div>
-          <div className="font-display text-3xl font-black text-bone mb-2 tabular-nums"><CountUp to={dna.artistDiversityScore} suffix="%" duration={1.4} /></div>
-          <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden mb-2">
-            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${dna.artistDiversityScore}%` }} />
-          </div>
-          <div className="text-[11px] text-neutral-500">
-            {dna.artistDiversityScore > 60 ? 'Wide genre palette across artists' : 'Concentrated in core genres'}
-          </div>
-        </div>
-
-        {/* Artist Loyalty */}
-        <div className="p-5 rounded-2xl bg-glass backdrop-blur-xl border border-white/5">
-          <div className="flex items-center justify-between text-neutral-400 mb-2">
-            <span className="text-xs font-semibold">Loyalty</span>
-            <Heart className="w-4 h-4 text-emerald-400" />
-          </div>
-          <div className="font-display text-3xl font-black text-bone mb-2 tabular-nums"><CountUp to={dna.artistLoyaltyScore} suffix="%" duration={1.4} /></div>
-          <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden mb-2">
-            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${dna.artistLoyaltyScore}%` }} />
-          </div>
-          <div className="text-[11px] text-neutral-500">
-            {dna.artistLoyaltyScore > 50 ? 'Strong retention of favourite artists' : 'Fast artist turnover & discovery'}
-          </div>
-        </div>
-
-        {/* Taste Evolution */}
-        <div className="p-5 rounded-2xl bg-glass backdrop-blur-xl border border-white/5">
-          <div className="flex items-center justify-between text-neutral-400 mb-2">
-            <span className="text-xs font-semibold">Evolution</span>
-            <Sparkles className="w-4 h-4 text-emerald-400" />
-          </div>
-          <div className="font-display text-3xl font-black text-bone mb-2 tabular-nums"><CountUp to={dna.evolvingTasteScore} suffix="%" duration={1.4} /></div>
-          <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden mb-2">
-            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${dna.evolvingTasteScore}%` }} />
-          </div>
-          <div className="text-[11px] text-neutral-500">
-            {dna.evolvingTasteScore > 60 ? 'Current taste is shifting rapidly' : 'Remarkably stable long-term taste'}
-          </div>
-        </div>
+      <div
+        className="relative mt-3 h-px bg-white/15"
+        role="meter"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={v}
+        aria-label={`${left} to ${right}`}
+      >
+        <span className="absolute left-1/2 top-1/2 h-3 w-px -translate-y-1/2 bg-white/25" aria-hidden="true" />
+        <span
+          className="absolute top-1/2 h-px bg-phosphor/70"
+          style={{ left: `${Math.min(v, 50)}%`, width: `${Math.abs(v - 50)}%` }}
+          aria-hidden="true"
+        />
+        <span
+          className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-ink bg-phosphor shadow-[0_0_20px_rgb(61_245_160/0.6)]"
+          style={{ left: `${v}%` }}
+          aria-hidden="true"
+        />
       </div>
+    </div>
+  );
+};
 
-      {/* Genre Architecture Hierarchy */}
-      <div className="p-6 rounded-[28px] bg-glass backdrop-blur-2xl border border-white/5">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Layers className="w-4 h-4 text-emerald-400" />
-              <span>Genre Hierarchy</span>
-            </h3>
-            <p className="text-xs text-neutral-400">
-              Categorized by listening frequency and artist density.
-            </p>
-          </div>
-        </div>
+// Slope chart: all-time rank (left) → this month's rank (right)
+const GenreDriftChart: React.FC<{ drift: GenreDrift[] }> = ({ drift }) => {
+  const [active, setActive] = useState<string | null>(null);
 
-        {/* Genre Tiers */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/5">
-            <div className="text-xs font-bold text-emerald-400 mb-2 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span>Dominant Genres</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {dna.genreCategories.dominant.map(g => (
-                <span key={g} className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 capitalize">
-                  {g}
-                </span>
-              ))}
-            </div>
-          </div>
+  const ranks = Math.max(...drift.flatMap(d => [d.thenRank ?? 0, d.nowRank ?? 0]), 1);
+  const W = 360;
+  const top = 34;
+  const row = 30;
+  const H = top + ranks * row + 4;
+  const xL = 128;
+  const xR = 232;
+  const stub = 34; // genres that enter or leave the top list get a short stub, not a full line
+  const y = (rank: number) => top + (rank - 0.5) * row;
+  const clip = (s: string) => (s.length > 17 ? `${s.slice(0, 16)}…` : s);
 
-          <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/5">
-            <div className="text-xs font-bold text-green-400 mb-2 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-green-400" />
-              <span>Secondary Genres</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {dna.genreCategories.secondary.map(g => (
-                <span key={g} className="px-2.5 py-1 rounded-lg text-xs font-medium bg-white/5 text-neutral-300 border border-white/5 capitalize">
-                  {g}
-                </span>
-              ))}
-            </div>
-          </div>
+  const tone = (d: GenreDrift) => {
+    if (d.thenRank === null || (d.nowRank !== null && d.nowRank < d.thenRank)) return 'var(--color-phosphor)';
+    if (d.nowRank === null || d.nowRank > d.thenRank) return 'var(--color-ultraviolet)';
+    return 'var(--color-bone)';
+  };
 
-          <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/5">
-            <div className="text-xs font-bold text-neutral-400 mb-2 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-neutral-500" />
-              <span>Occasional Explorations</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {dna.genreCategories.occasional.map(g => (
-                <span key={g} className="px-2.5 py-1 rounded-lg text-xs font-normal bg-white/[0.02] text-neutral-400 border border-white/5 capitalize">
-                  {g}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
+  const describe = (d: GenreDrift) => {
+    if (d.thenRank === null) return `${d.name}: new, now #${d.nowRank}`;
+    if (d.nowRank === null) return `${d.name}: was #${d.thenRank}, out of your top genres now`;
+    return `${d.name}: #${d.thenRank} all time, #${d.nowRank} this month`;
+  };
 
-        {/* Top 12 Genre Bars */}
-        <div className="space-y-3">
-          <div className="text-xs font-semibold text-neutral-400 mb-2">
-            Weighted Frequency Distribution
-          </div>
-          {dna.topGenres.slice(0, 10).map((genre) => (
-            <div key={genre.name} className="flex items-center gap-3">
-              <span className="w-36 sm:w-44 text-xs font-medium text-neutral-300 truncate capitalize text-right">
-                {genre.name}
-              </span>
-              <div className="flex-1 h-3 rounded-full bg-white/5 overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-emerald-500 to-green-300 rounded-full transition-all duration-500"
-                  style={{ width: `${genre.score}%` }}
-                />
-              </div>
-              <span className="w-10 text-xs font-semibold text-neutral-400 text-left">
-                {genre.score}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
+  return (
+    <div className="mx-auto max-w-[560px]">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Genre ranks, all time versus this month">
+        <text x={xL} y={14} textAnchor="end" className="fill-neutral-400" fontSize="11" fontWeight="600">All time</text>
+        <text x={xR} y={14} textAnchor="start" className="fill-neutral-400" fontSize="11" fontWeight="600">This month</text>
+        <line x1={xL} x2={xL} y1={top - 8} y2={H - 6} stroke="rgb(255 255 255 / 0.12)" />
+        <line x1={xR} x2={xR} y1={top - 8} y2={H - 6} stroke="rgb(255 255 255 / 0.12)" />
 
-      {/* Core Artists Section */}
-      <div className="p-6 rounded-[28px] bg-glass backdrop-blur-2xl border border-white/5">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Heart className="w-4 h-4 text-emerald-400" />
-              <span>Core Favourite Artists</span>
-            </h3>
-            <p className="text-xs text-neutral-400">
-              Artists who consistently appear across your short, medium, and long-term listening history.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {dna.coreArtists.slice(0, 9).map((artist) => (
-            <div 
-              key={artist.artist_id}
-              className="p-4 rounded-2xl bg-white/[0.04] border border-white/5 flex items-center gap-3.5 group hover:border-emerald-500/20 transition-all"
+        {drift.map(d => {
+          const color = tone(d);
+          const dim = active !== null && active !== d.name;
+          const on = active === d.name;
+          const partial = d.thenRank === null || d.nowRank === null;
+          // Full line between both ranks, or a stub off the one rank it has
+          const y1 = d.thenRank !== null ? y(d.thenRank) : y(d.nowRank!);
+          const y2 = d.nowRank !== null ? y(d.nowRank) : y(d.thenRank!);
+          const x1 = d.thenRank !== null ? xL : xR - stub;
+          const x2 = d.nowRank !== null ? xR : xL + stub;
+          return (
+            <g
+              key={d.name}
+              onMouseEnter={() => setActive(d.name)}
+              onMouseLeave={() => setActive(null)}
+              onClick={() => setActive(on ? null : d.name)}
+              style={{ cursor: 'pointer', opacity: dim ? 0.18 : 1, transition: 'opacity 200ms' }}
             >
-              <div className="w-12 h-12 rounded-xl bg-neutral-800 overflow-hidden flex-shrink-0">
-                {artist.image_url ? (
-                  <img src={artist.image_url} alt={artist.artist_name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center font-bold text-neutral-400">
-                    {artist.artist_name.charAt(0)}
-                  </div>
-                )}
-              </div>
+              <title>{describe(d)}</title>
+              <line
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                stroke={color}
+                strokeWidth={on ? 3 : 2}
+                strokeOpacity={partial ? 0.6 : 0.85}
+                strokeDasharray={partial ? '3 4' : undefined}
+                strokeLinecap="round"
+              />
+              {d.thenRank !== null && (
+                <>
+                  <circle cx={xL} cy={y1} r={4} fill={color} />
+                  <text x={xL - 10} y={y1 + 4} textAnchor="end" fontSize="11.5" className="fill-neutral-200 capitalize">
+                    {clip(d.name)}
+                  </text>
+                </>
+              )}
+              {d.nowRank !== null && (
+                <>
+                  <circle cx={xR} cy={y2} r={4} fill={color} />
+                  <text x={xR + 10} y={y2 + 4} textAnchor="start" fontSize="11.5" className="fill-neutral-200 capitalize">
+                    {clip(d.name)}
+                  </text>
+                </>
+              )}
+              {/* wide invisible hit area so thin lines are easy to tap */}
+              <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="transparent" strokeWidth={14} />
+            </g>
+          );
+        })}
+      </svg>
+      <p className="mt-4 min-h-[1.25rem] text-center text-xs text-neutral-400" aria-live="polite">
+        {active ? describe(drift.find(d => d.name === active)!) : (
+          <>
+            <span className="text-phosphor">Mint</span> is climbing, <span className="text-ultraviolet">violet</span> is
+            fading. Short dashes are genres that joined or left your top {ranks}.
+          </>
+        )}
+      </p>
+    </div>
+  );
+};
 
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-white truncate">
-                  {artist.artist_name}
-                </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    Loyalty {artist.loyaltyScore}/3
-                  </span>
-                  <span className="text-xs text-neutral-500 truncate">
-                    {artist.genres.slice(0, 2).join(', ')}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+const Avatar: React.FC<{ name: string; src: string | null; className?: string }> = ({ name, src, className = '' }) => (
+  <div className={`overflow-hidden rounded-full bg-neutral-800 ring-1 ring-white/10 ${className}`}>
+    {src ? (
+      <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
+    ) : (
+      <div className="flex h-full w-full items-center justify-center font-display font-bold text-neutral-400">
+        {name.charAt(0)}
       </div>
+    )}
+  </div>
+);
+
+const ArtistColumn: React.FC<{
+  title: string;
+  empty: string;
+  artists: ShiftArtist[];
+  caption: (a: ShiftArtist) => string;
+  accent: 'phosphor' | 'ultraviolet';
+}> = ({ title, empty, artists, caption, accent }) => (
+  <div>
+    <h3 className={`border-l-2 pl-3 text-sm font-semibold text-bone ${accent === 'phosphor' ? 'border-phosphor' : 'border-ultraviolet'}`}>
+      {title}
+    </h3>
+    {artists.length === 0 ? (
+      <p className="mt-4 text-sm text-neutral-500">{empty}</p>
+    ) : (
+      <ul className="mt-5 space-y-4">
+        {artists.map(a => (
+          <li key={a.artist_id} className="flex items-center gap-4">
+            <Avatar name={a.artist_name} src={a.image_url} className={`h-11 w-11 shrink-0 ${accent === 'ultraviolet' ? 'opacity-70 grayscale-[40%]' : ''}`} />
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-bone">{a.artist_name}</div>
+              <div className="text-xs text-neutral-500">{caption(a)}</div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    )}
+  </div>
+);
+
+function formatDate(iso: string): string {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', timeZone: 'UTC' });
+}
+
+const Sparkline: React.FC<{ values: number[] }> = ({ values }) => {
+  const W = 240;
+  const H = 36;
+  const step = W / Math.max(values.length - 1, 1);
+  const pts = values.map((v, i) => `${(i * step).toFixed(1)},${(H - (v / 100) * H).toFixed(1)}`).join(' ');
+  const last = values[values.length - 1];
+  return (
+    <svg viewBox={`-4 -4 ${W + 8} ${H + 8}`} className="mt-2 h-auto w-full" aria-hidden="true">
+      <line x1={0} x2={W} y1={H / 2} y2={H / 2} stroke="rgb(255 255 255 / 0.08)" strokeDasharray="2 4" />
+      <polyline points={pts} fill="none" stroke="var(--color-phosphor)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={(values.length - 1) * step} cy={H - (last / 100) * H} r={3.5} fill="var(--color-phosphor)" />
+    </svg>
+  );
+};
+
+const Timeline: React.FC<{ history: TasteSnapshot[] }> = ({ history }) => {
+  const first = history[0];
+  const last = history[history.length - 1];
+  const metrics: Array<{ label: string; key: 'mainstream' | 'diversity' | 'loyalty' }> = [
+    { label: 'Mainstream', key: 'mainstream' },
+    { label: 'Eclectic', key: 'diversity' },
+    { label: 'Loyal', key: 'loyalty' },
+  ];
+
+  // Days where the archetype changed from the previous snapshot
+  const changes = history.filter((s, i) => i === 0 || s.archetype !== history[i - 1].archetype);
+
+  return (
+    <div className="mt-8 space-y-10">
+      <p className="text-sm text-neutral-400">
+        {history.length} snapshots from {formatDate(first.date)} to {formatDate(last.date)}.
+      </p>
+      <div className="grid gap-8 sm:grid-cols-3">
+        {metrics.map(m => {
+          const delta = last[m.key] - first[m.key];
+          return (
+            <div key={m.key}>
+              <div className="flex items-baseline justify-between">
+                <span className="text-sm font-semibold text-bone">{m.label}</span>
+                <span className="text-xs tabular-nums text-neutral-400">
+                  {first[m.key]} to {last[m.key]}
+                  {delta !== 0 && (
+                    <span className={delta > 0 ? 'text-phosphor' : 'text-ultraviolet'}> ({delta > 0 ? '+' : ''}{delta})</span>
+                  )}
+                </span>
+              </div>
+              <Sparkline values={history.map(s => s[m.key])} />
+            </div>
+          );
+        })}
+      </div>
+      <ol className="relative max-w-xl space-y-5 border-l border-white/10 pl-6">
+        {changes.map(s => (
+          <li key={s.date} className="relative">
+            <span className="absolute -left-[29px] top-1.5 h-2.5 w-2.5 rounded-full bg-phosphor ring-4 ring-ink" aria-hidden="true" />
+            <div className="text-xs text-neutral-500">{formatDate(s.date)}</div>
+            <div className="text-sm font-semibold text-bone">{s.archetype}</div>
+            <div className="text-xs capitalize text-neutral-400">{s.topGenres.slice(0, 3).join(', ')}</div>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 };

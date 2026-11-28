@@ -24,6 +24,7 @@ import { saveTokens, deleteTokens } from '../services/token.service';
 import { getCurrentUserProfile } from '../services/spotify.service';
 import { upsertUser } from '../services/user.service';
 import { syncUserData } from '../services/sync.service';
+import { generateMusicDNA } from '../services/music-dna.service';
 import type { SpotifyTokenResponse } from '../types/spotify';
 
 export const authRouter = Router();
@@ -167,7 +168,10 @@ authRouter.get('/spotify/callback', async (req, res): Promise<void> => {
     // 9. Kick off background data sync (non-blocking — user gets redirected immediately)
     setImmediate(() => {
       syncUserData(profile.id, tokens.access_token)
-        .then(result => console.log(`[auth] Background sync complete: ${JSON.stringify(result.itemsSynced)}`))
+        .then(result => {
+          console.log(`[auth] Background sync complete: ${JSON.stringify(result.itemsSynced)}`);
+          generateMusicDNA(profile.id);
+        })
         .catch(err => console.error('[auth] Background sync failed:', err));
     });
 

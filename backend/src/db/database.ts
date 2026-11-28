@@ -92,6 +92,24 @@ function initSchema(db: Database.Database): void {
     )
   `);
 
+  // Daily Music DNA snapshots — one row per user per day, powers the taste timeline
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS music_profile_history (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id         TEXT NOT NULL,
+      snapshot_date   TEXT NOT NULL,  -- YYYY-MM-DD (UTC)
+      archetype       TEXT NOT NULL,
+      mainstream      INTEGER NOT NULL,
+      diversity       INTEGER NOT NULL,
+      loyalty         INTEGER NOT NULL,
+      evolving        INTEGER NOT NULL,
+      top_genres      TEXT NOT NULL,  -- JSON array of genre names
+      created_at      INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      UNIQUE(user_id, snapshot_date),
+      FOREIGN KEY (user_id) REFERENCES users(spotify_id) ON DELETE CASCADE
+    )
+  `);
+
   // Feedback table — stores user reactions to recommendations (Phase 5-6)
   db.exec(`
     CREATE TABLE IF NOT EXISTS recommendation_feedback (

@@ -6,13 +6,14 @@
  * POST /data/sync          → Trigger full Spotify data sync
  * GET  /data/sync/status   → Check sync status and freshness
  * GET  /data/music-dna     → Get/generate Music DNA profile
+ * GET  /data/music-dna/history → Daily taste snapshots for the timeline
  * POST /data/music-dna/refresh → Force regenerate Music DNA
  */
 
 import { Router } from 'express';
 import { requireAuth, getAuthLocals } from '../middleware/auth.middleware';
 import { syncUserData, getLastSyncTime, hasCachedData } from '../services/sync.service';
-import { generateMusicDNA, getStoredMusicDNA } from '../services/music-dna.service';
+import { generateMusicDNA, getStoredMusicDNA, getMusicDnaHistory } from '../services/music-dna.service';
 
 export const dataRouter = Router();
 dataRouter.use(requireAuth);
@@ -27,6 +28,9 @@ dataRouter.post('/sync', async (_req, res, next) => {
 
     console.log(`[data] Sync triggered for user: ${spotifyUserId}`);
     const result = await syncUserData(spotifyUserId, accessToken);
+
+    // Recompute DNA from the fresh data so today's taste snapshot is recorded
+    if (hasCachedData(spotifyUserId)) generateMusicDNA(spotifyUserId);
 
     res.json({
       success: result.success,
@@ -75,8 +79,8 @@ dataRouter.get('/music-dna', (_req, res, next) => {
     // Try stored first
     let dna = getStoredMusicDNA(spotifyUserId);
 
-    // Generate fresh if not stored (uses cached Spotify data)
-    if (!dna) {
+    // Generate fresh if not stored, or if stored before taste-shift analysis existed
+    if (!dna || !dna.taste) {
       if (!hasCachedData(spotifyUserId)) {
         res.status(404).json({
           error: 'NO_DATA',
@@ -91,6 +95,16 @@ dataRouter.get('/music-dna', (_req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// ---------------------------------------------------------------------------
+// GET /data/music-dna/history — daily taste snapshots, oldest first
+// ---------------------------------------------------------------------------
+
+dataRouter.get('/music-dna/history', (_req, res) => {
+  const { spotifyUserId } = getAuthLocals(res);
+  const history = getMusicDnaHistory(spotifyUserId);
+  res.json({ history, count: history.length });
 });
 
 // ---------------------------------------------------------------------------

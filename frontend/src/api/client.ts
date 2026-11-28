@@ -4,6 +4,7 @@ import type {
   SpotifyTrack,
   SpotifyArtist,
   MusicDNA,
+  TasteSnapshot,
   SyncStatus,
   ChatMessage,
 } from '../types';
@@ -79,6 +80,11 @@ export const getMusicDNA = async (): Promise<MusicDNA> => {
 export const refreshMusicDNA = async (): Promise<MusicDNA> => {
   const { data } = await api.post('/data/music-dna/refresh');
   return data;
+};
+
+export const getMusicDnaHistory = async (): Promise<TasteSnapshot[]> => {
+  const { data } = await api.get('/data/music-dna/history');
+  return data.history;
 };
 
 // AI Companion Chat
