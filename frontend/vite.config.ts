@@ -13,6 +13,11 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  build: {
+    // Transpile down far enough for older phones (iOS 15 Safari, older Android
+    // Chrome); the default target leaves a blank page on those browsers.
+    target: ['es2020', 'safari15', 'chrome90', 'firefox90', 'edge90'],
+  },
   server: {
     host: true, // Listen on all network addresses (0.0.0.0) so phone on same Wi-Fi can connect
     port: 5173,

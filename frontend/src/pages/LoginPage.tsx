@@ -9,9 +9,51 @@ const CAPABILITIES = [
   { title: 'Playlists, verified', body: 'Up to 50 songs, each checked against Spotify before it reaches your library.' },
 ];
 
-export const LoginPage: React.FC = () => (
+const LOGIN_ERRORS: Record<string, string> = {
+  access_denied: 'Spotify access was cancelled. Tap Connect Spotify to try again.',
+  state_mismatch:
+    'The sign-in session expired before Spotify sent you back. Try again, and open this site directly in Chrome or Safari rather than inside another app.',
+  invalid_callback: 'Spotify sent back an incomplete response. Please try again.',
+  auth_failed:
+    'Spotify sign-in failed. If this app is in Spotify Development Mode, your Spotify account must be added under User Management in the Spotify Developer Dashboard.',
+};
+
+function readLoginError(): string | null {
+  const code = new URLSearchParams(window.location.search).get('error');
+  if (!code) return null;
+  return LOGIN_ERRORS[code] ?? 'Sign-in failed. Please try again.';
+}
+
+export const LoginPage: React.FC = () => {
+  const [error, setError] = React.useState<string | null>(readLoginError);
+
+  React.useEffect(() => {
+    // Drop ?error= from the address bar so a refresh doesn't re-show it
+    if (window.location.search) window.history.replaceState(null, '', window.location.pathname);
+  }, []);
+
+  return (
   <div className="relative min-h-screen overflow-hidden text-bone">
     <Aura />
+
+    {error && (
+      <div
+        role="alert"
+        className="fixed inset-x-4 top-4 z-20 mx-auto max-w-md rounded-2xl border border-red-400/40 bg-red-950/90 px-4 py-3 text-sm text-red-100 shadow-lg backdrop-blur"
+      >
+        <div className="flex items-start gap-3">
+          <p className="flex-1 leading-relaxed">{error}</p>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            className="shrink-0 text-red-200/80 hover:text-red-100"
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+    )}
 
     <div className="relative z-10 mx-auto flex min-h-screen max-w-6xl flex-col px-5 sm:px-10 py-8">
       <div className="flex items-center gap-3">
@@ -57,4 +99,5 @@ export const LoginPage: React.FC = () => (
       </div>
     </div>
   </div>
-);
+  );
+};

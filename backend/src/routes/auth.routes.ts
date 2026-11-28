@@ -42,12 +42,49 @@ function resolveRedirectUri(req: Router extends never ? never : import('express'
 }
 
 // ---------------------------------------------------------------------------
+// Signed OAuth state
+//
+// WHY: On phones the session cookie is often lost between /auth/spotify and the
+// callback — the Spotify app intercepts accounts.spotify.com, an in-app browser
+// (WhatsApp, Instagram) hands off to Chrome/Safari, or an installed PWA has its
+// own cookie jar. A purely session-bound state then always fails and the user
+// is bounced back to the login page. The state is therefore also HMAC-signed
+// with a short expiry so the callback can verify it even without the cookie.
+// ---------------------------------------------------------------------------
+
+const STATE_TTL_MS = 10 * 60 * 1000;
+
+function signState(nonce: string, issuedAt: number): string {
+  return crypto
+    .createHmac('sha256', env.session.secret)
+    .update(`${nonce}.${issuedAt}`)
+    .digest('hex');
+}
+
+function createState(): string {
+  const nonce = crypto.randomBytes(16).toString('hex');
+  const issuedAt = Date.now();
+  return `${nonce}.${issuedAt}.${signState(nonce, issuedAt)}`;
+}
+
+function isSignedStateValid(state: string): boolean {
+  const [nonce, issuedAtRaw, signature] = state.split('.');
+  const issuedAt = Number(issuedAtRaw);
+  if (!nonce || !signature || !Number.isFinite(issuedAt)) return false;
+  if (Date.now() - issuedAt > STATE_TTL_MS || issuedAt > Date.now() + 60_000) return false;
+
+  const expected = Buffer.from(signState(nonce, issuedAt), 'hex');
+  const actual = Buffer.from(signature, 'hex');
+  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+}
+
+// ---------------------------------------------------------------------------
 // GET /auth/spotify — Start Spotify OAuth flow
 // ---------------------------------------------------------------------------
 
 authRouter.get('/spotify', (req, res) => {
-  // Generate a cryptographically random state nonce (CSRF protection)
-  const state = crypto.randomBytes(32).toString('hex');
+  // Random nonce + timestamp, HMAC-signed (CSRF protection; see signed state above)
+  const state = createState();
   const redirectUri = resolveRedirectUri(req);
   req.session.oauthState = state;
   req.session.oauthRedirectUri = redirectUri;
@@ -88,16 +125,22 @@ authRouter.get('/spotify/callback', async (req, res): Promise<void> => {
     return;
   }
 
-  // 3. CSRF state validation — compare against what we stored in the session
+  // 3. CSRF state validation. If the session still holds the state it must match
+  //    exactly; if the cookie was lost (common on phones), fall back to the
+  //    signature + expiry check.
   const expectedState = req.session.oauthState;
-  if (!expectedState || state !== expectedState) {
-    console.warn('[auth] OAuth state mismatch — possible CSRF attempt');
+  const stateOk = expectedState ? state === expectedState : isSignedStateValid(state);
+  if (!stateOk) {
+    console.warn(`[auth] OAuth state rejected (session state present: ${!!expectedState})`);
     res.redirect('/?error=state_mismatch');
     return;
   }
+  if (!expectedState) {
+    console.log('[auth] Session cookie missing on callback — accepted via signed state');
+  }
 
-  // Retrieve matching redirectUri for token exchange
-  const redirectUri = req.session.oauthRedirectUri || env.spotify.redirectUri;
+  // Retrieve matching redirectUri for token exchange (recompute if the session was lost)
+  const redirectUri = req.session.oauthRedirectUri || resolveRedirectUri(req);
 
   // Clear single-use state from session
   delete req.session.oauthState;
